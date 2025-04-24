@@ -397,11 +397,8 @@ def proxy(path):
             return Response(f"Invalid '{auth_header_openai}' header format.", status=401, mimetype='text/plain')
         placeholder_token_provided = parts[1]
     else:
-        # Expect Gemini style "x-goog-api-key: PLACEHOLDER_TOKEN"
-        if api_key_header_gemini not in incoming_headers:
-            logging.warning(f"Gemini Request rejected: Missing '{api_key_header_gemini}' header.")
-            return Response(f"Missing '{api_key_header_gemini}' header", status=400, mimetype='text/plain') # Bad Request might be more appropriate
-        placeholder_token_provided = incoming_headers[api_key_header_gemini]
+        # Accept requests even if 'x-goog-api-key' is missing; always use the placeholder token
+        placeholder_token_provided = incoming_headers.get(api_key_header_gemini, PLACEHOLDER_TOKEN)
 
     # Validate the provided token against the configured placeholder
     if placeholder_token_provided != PLACEHOLDER_TOKEN:

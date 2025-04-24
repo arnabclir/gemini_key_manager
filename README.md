@@ -48,7 +48,7 @@ This is particularly useful when you have multiple API keys and want to distribu
     ```
     The server will start listening on `http://0.0.0.0:5000` by default.
 5.  **Configure Clients:**
-    *   **For Direct Gemini API Usage:** Update your client applications to send requests to the proxy server's address (`http://<proxy_server_ip>:5000/<gemini_path>`, e.g., `http://localhost:5000/v1beta/models/gemini-pro:generateContent`). Ensure clients use the configured `PLACEHOLDER_GEMINI_TOKEN` in the `x-goog-api-key` header for authentication against the proxy.
+    *   **For Direct Gemini API Usage:** Update your client applications to send requests to the proxy server's address (`http://<proxy_server_ip>:5000/<gemini_path>`, e.g., `http://localhost:5000/v1beta/models/gemini-pro:generateContent`). Clients may optionally include the configured `PLACEHOLDER_GEMINI_TOKEN` in the `x-goog-api-key` header for authentication against the proxy. If omitted, the proxy will still process the request.
     *   **For OpenAI API Compatibility:** Configure your client (like CherryStudio, etc.) to use the proxy server's address as the base URL and target the `/v1/chat/completions` endpoint (e.g., `http://localhost:5000/v1/chat/completions`). The client should use the `PLACEHOLDER_GEMINI_TOKEN` as the API Key (typically sent as a Bearer token in the `Authorization` header). The proxy will handle the translation to and from the Gemini API.
 
 ## Deployment Note

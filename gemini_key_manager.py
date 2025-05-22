@@ -391,8 +391,11 @@ def proxy(path):
                  except Exception:
                       logging.debug("Could not decode forwarding request body for logging.")
 
-            # Determine method - OpenAI endpoint is always POST
-            forward_method = 'POST' if is_openai_format else request.method
+            # Determine method: Gemini content generation endpoints are always POST
+            if "generateContent" in target_path or "streamGenerateContent" in target_path:
+                forward_method = 'POST'
+            else:
+                forward_method = request.method
             logging.info(f"Forwarding {forward_method} request to: {target_url} with key ...{next_key[-4:]}")
             logging.debug(f"Forwarding with Query Params: {query_params}")
             logging.debug(f"Forwarding with Headers: {outgoing_headers}")

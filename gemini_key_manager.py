@@ -14,7 +14,7 @@ import uuid # For generating OpenAI response IDs
 # Placeholder token that clients will use in the 'x-goog-api-key' header
 PLACEHOLDER_TOKEN = "PLACEHOLDER_GEMINI_TOKEN"
 # File containing the real Google Gemini API keys, one per line
-API_KEY_FILE = "key.txt"
+API_KEYS_ENV_VAR_NAME = "GEMINI_API_KEYS"
 # Base URL for the actual Google Gemini API
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com"
 # Host and port for the proxy server to listen on
@@ -37,8 +37,8 @@ key_usage_counts = {}
 exhausted_keys_today = set()
 # Track the date for which the counts and exhausted list are valid
 current_usage_date = date.today()
-# File to store usage data
-USAGE_DATA_FILE = "key_usage.txt"
+# File to store usage data (commented out for Railway deployment, use external storage for persistence)
+# USAGE_DATA_FILE = "key_usage.txt"
 # --- End Global Variables ---
 
 # --- Logging Setup ---
@@ -85,102 +85,53 @@ def setup_logging():
     logging.info("Logging configured. Level: %s, File: %s", logging.getLevelName(log_level), log_filename_with_ts if file_handler else "N/A")
 
 # --- Usage Data Handling ---
-def load_usage_data(filename=USAGE_DATA_FILE):
-    """Loads usage data (counts and exhausted keys) from the specified file for today's date."""
-    global key_usage_counts, current_usage_date, exhausted_keys_today
-    today_str = date.today().isoformat()
-    current_usage_date = date.today() # Ensure current_usage_date is set
-
-    script_dir = os.path.dirname(__file__) if '__file__' in globals() else '.'
-    filepath = os.path.join(script_dir, filename)
-    logging.info(f"Attempting to load usage data for {today_str} from: {filepath}")
-
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-
-        if data.get("date") == today_str:
-            key_usage_counts = data.get("counts", {})
-            # Load exhausted keys as a set
-            exhausted_keys_today = set(data.get("exhausted_keys", []))
-            logging.info(f"Successfully loaded usage data for {today_str}.")
-            logging.info(f"  Counts: {key_usage_counts}")
-            logging.info(f"  Exhausted keys today: {exhausted_keys_today}")
-        else:
-            logging.info(f"Usage data in {filepath} is for a previous date ({data.get('date')}). Starting fresh counts and exhausted list for {today_str}.")
-            key_usage_counts = {} # Reset counts
-            exhausted_keys_today = set() # Reset exhausted keys
-
-    except FileNotFoundError:
-        logging.info(f"Usage data file not found: {filepath}. Starting with empty counts and exhausted list.")
-        key_usage_counts = {}
-        exhausted_keys_today = set()
-    except json.JSONDecodeError:
-        logging.error(f"Error decoding JSON from usage data file: {filepath}. Starting with empty counts and exhausted list.")
-        key_usage_counts = {}
-        exhausted_keys_today = set()
-    except Exception as e:
-        logging.error(f"An error occurred while loading usage data from {filepath}: {e}", exc_info=True)
-        key_usage_counts = {}
-        exhausted_keys_today = set()
-
-def save_usage_data(filename=USAGE_DATA_FILE):
-    """Saves the current usage data (date, counts, exhausted keys) to the specified file."""
-    global key_usage_counts, current_usage_date, exhausted_keys_today
-    today_str = current_usage_date.isoformat() # Use the tracked date
-    data_to_save = {
-        "date": today_str,
-        "counts": key_usage_counts,
-        "exhausted_keys": list(exhausted_keys_today) # Convert set to list for JSON
-    }
-
-    script_dir = os.path.dirname(__file__) if '__file__' in globals() else '.'
-    filepath = os.path.join(script_dir, filename)
-
-    try:
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(data_to_save, f, indent=4)
-        logging.debug(f"Successfully saved usage data for {today_str} to {filepath}. Counts: {key_usage_counts}")
-    except Exception as e:
-        logging.error(f"An error occurred while saving usage data to {filepath}: {e}", exc_info=True)
-
 # --- API Key Loading ---
-def load_api_keys(filename):
+def load_api_keys(env_var_name):
     """
-    Loads API keys from a specified file (one key per line), stores them globally.
-    Handles potential errors like file not found or empty file.
+    Loads API keys from a specified environment variable (comma-separated),
+    stores them globally. Handles potential errors like variable not found or empty.
     Returns the list of keys or None if loading fails.
     """
     global all_api_keys # Ensure we modify the global list
     keys = []
-    # Construct the full path relative to the script's directory or CWD
-    script_dir = os.path.dirname(__file__) if '__file__' in globals() else '.'
-    filepath = os.path.join(script_dir, filename)
 
-    logging.info(f"Attempting to load API keys from: {filepath}")
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            # Read non-empty lines and strip whitespace
-            keys = [line.strip() for line in f if line.strip()]
+    logging.info(f"Attempting to load API keys from environment variable: {env_var_name}")
+    api_keys_str = os.getenv(env_var_name)
 
-        if not keys:
-            logging.error(f"No API keys found in {filepath}. File might be empty or contain only whitespace.")
-            return None
-        else:
-            logging.info(f"Successfully loaded {len(keys)} API keys.")
-            # Log loaded keys partially masked for security (DEBUG level)
-            for i, key in enumerate(keys):
-                 logging.debug(f"  Key {i+1}: ...{key[-4:]}")
-            all_api_keys = keys # Store the loaded keys globally
-            return keys
-
-    except FileNotFoundError:
-        logging.error(f"API key file not found: {filepath}")
+    if not api_keys_str:
+        logging.error(f"Environment variable '{env_var_name}' not found or is empty.")
         return None
-    except Exception as e:
-        # Log the full exception details for debugging
-        logging.error(f"An error occurred while loading API keys from {filepath}: {e}", exc_info=True)
+
+    # Split by comma and strip whitespace from each key
+    keys = [key.strip() for key in api_keys_str.split(',') if key.strip()]
+
+    if not keys:
+        logging.error(f"No API keys found in environment variable '{env_var_name}'. It might be empty or contain only delimiters.")
         return None
+    else:
+        logging.info(f"Successfully loaded {len(keys)} API keys from environment variable.")
+        # Log loaded keys partially masked for security (DEBUG level)
+        for i, key in enumerate(keys):
+             logging.debug(f"  Key {i+1}: ...{key[-4:]}")
+        all_api_keys = keys # Store the loaded keys globally
+        return keys
+
+# --- Usage Data Handling (In-memory for Railway, no file persistence) ---
+# The following functions are modified to be no-ops or simplified for Railway deployment
+# where file system persistence is not guaranteed across restarts.
+# For persistent usage tracking, an external database or service would be required.
+
+def load_usage_data():
+    """Initializes usage data (counts and exhausted keys) in-memory."""
+    global key_usage_counts, current_usage_date, exhausted_keys_today
+    logging.info("Initializing in-memory usage data. No file loading for Railway deployment.")
+    current_usage_date = date.today()
+    key_usage_counts = {}
+    exhausted_keys_today = set()
+
+def save_usage_data():
+    """Placeholder for saving usage data. No-op for Railway deployment."""
+    logging.debug("Skipping usage data save. In-memory tracking only for Railway deployment.")
 
 # --- Helper Functions ---
 
@@ -306,7 +257,7 @@ def proxy(path):
         current_usage_date = today
         key_usage_counts = {}
         exhausted_keys_today = set() # Reset exhausted keys as well
-        save_usage_data() # Save the reset state
+        save_usage_data() # Call the no-op save for Railway
 
     # Ensure keys were loaded and the cycler is available
     if not all_api_keys or key_cycler is None: # Check all_api_keys as well
@@ -468,7 +419,7 @@ def proxy(path):
             if resp.status_code == 429:
                 logging.warning(f"Key ending ...{next_key[-4:]} hit rate limit (429). Marking as exhausted for today.")
                 exhausted_keys_today.add(next_key)
-                save_usage_data() # Save the updated exhausted list
+                save_usage_data() # Call the no-op save for Railway
 
                 # Check if all keys are now exhausted after this failure
                 if len(exhausted_keys_today) >= len(all_api_keys):
@@ -483,7 +434,7 @@ def proxy(path):
             current_count = key_usage_counts.get(next_key, 0) + 1
             key_usage_counts[next_key] = current_count
             logging.info(f"Key ending ...{next_key[-4:]} used successfully. Today's usage count: {current_count}")
-            save_usage_data() # Save updated counts and potentially exhausted list (if changed by another thread/process, though unlikely here)
+            save_usage_data() # Call the no-op save for Railway
 
             # --- Response Handling ---
             logging.debug(f"Response Headers from Google: {dict(resp.headers)}")
@@ -723,25 +674,18 @@ def proxy(path):
 
 # --- Main Execution ---
 if __name__ == '__main__':
-    setup_logging() # Configure logging first
-
-    # Load API keys from the specified file
-    api_keys = load_api_keys(API_KEY_FILE)
-
-    if api_keys:
-        # Initialize the key cycler if keys were loaded successfully
-        key_cycler = cycle(api_keys)
-
-        # Load usage data after keys are loaded but before starting server
+    setup_logging()
+    # Load API keys at startup from environment variable
+    loaded_keys = load_api_keys(API_KEYS_ENV_VAR_NAME)
+    if loaded_keys:
+        key_cycler = cycle(loaded_keys)
+        # Load usage data (in-memory for Railway)
         load_usage_data()
-
-        logging.info(f"Starting Gemini proxy server on http://{LISTEN_HOST}:{LISTEN_PORT}")
-        logging.info(f"Proxy configured to use placeholder token: {PLACEHOLDER_TOKEN}")
-        logging.info(f"Requests will be forwarded to: {GEMINI_API_BASE_URL}")
-        logging.info(f"Ready to process requests...")
-        # Run the Flask development server
-        # For production, consider using a proper WSGI server like Gunicorn or Waitress
-        app.run(host=LISTEN_HOST, port=LISTEN_PORT)
+        logging.info("Proxy server starting...")
+        try:
+            app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=False)
+        except Exception as e:
+            logging.critical(f"Proxy server failed to start: {e}", exc_info=True)
     else:
         logging.critical("Proxy server failed to start: Could not load API keys.")
         sys.exit(1) # Exit if keys could not be loaded

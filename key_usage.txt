@@ -1,0 +1,22 @@
+{
+    "date": "2025-05-22",
+    "counts": {
+        "AIzaSyBUcGQ3psoRmhbOMAvZRE5UX47g8HwCkIY": 5,
+        "AIzaSyCbwrC2E-HU63CjHCiw-JC04aImc-J1HI8": 5,
+        "AIzaSyBsZOq8JM1kekHdtASRKwnsv08EdDb73nQ": 4,
+        "AIzaSyCyKs56rgTt3fYsOLLSujMHEftHP8GaawQ": 4,
+        "AIzaSyBl-87J2-s-ZGCRmzPlV3owJk0byDHAs2s": 4,
+        "AIzaSyAEAP5d99WP8iq170T8sLaEJV0Efflkv30": 4,
+        "AIzaSyDNL8Xvu00B521s4LQ_ZP7ZSXkcoR9c0Zc": 4,
+        "AIzaSyDbaLX5GK2ljlHIm0E4YgPFeGQE9Rkatx8": 4,
+        "AIzaSyBW1tJl-oy29FV7dWGD7fUVbKC5pk5OisE": 4,
+        "AIzaSyAUgjuvMXd1MkKZodMnZrarYykURJY-fmQ": 4,
+        "AIzaSyBgKKVwF4TEuRUv5XeMMkhB9nhN85P_IMU": 4,
+        "AIzaSyCoKd7csnqOfMM0e4kRGG-D3jSHlsDtXZM": 4,
+        "AIzaSyB4s1LNm2PFeC5jnSAeiGGvTpLllyvtsuk": 4,
+        "AIzaSyAtXLC5O9ojla9wZANhjgtu2RjeRfyST_c": 4,
+        "AIzaSyCCppYabwSL6VfLOSwv-uOLaqd-JBODUVg": 4,
+        "AIzaSyBwAGf5ZKHJNsfrXE4cpP5dO18nLjA-o2U": 3
+    },
+    "exhausted_keys": []
+}

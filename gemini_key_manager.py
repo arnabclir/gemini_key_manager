@@ -250,6 +250,11 @@ def proxy(path):
     is_openai_format = is_openai_chat_request(original_request_path)
     logging.info(f"Request received for path: {original_request_path}. OpenAI format detected: {is_openai_format}")
 
+    # If it's a GET request to a content generation endpoint, return 405
+    if request.method == 'GET' and ("generateContent" in original_request_path or "streamGenerateContent" in original_request_path):
+        logging.warning(f"GET request to content generation endpoint '{original_request_path}' is not allowed. Only POST is supported.")
+        return Response("Method Not Allowed: Content generation endpoints require POST requests.", status=405, mimetype='text/plain')
+
     # --- Daily Usage Reset Check ---
     today = date.today()
     if today != current_usage_date:

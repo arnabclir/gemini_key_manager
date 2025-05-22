@@ -250,10 +250,6 @@ def proxy(path):
     is_openai_format = is_openai_chat_request(original_request_path)
     logging.info(f"Request received for path: {original_request_path}. OpenAI format detected: {is_openai_format}")
 
-    # If it's a GET request to a content generation endpoint, return 405
-    if request.method == 'GET' and ("generateContent" in original_request_path or "streamGenerateContent" in original_request_path):
-        logging.warning(f"GET request to content generation endpoint '{original_request_path}' is not allowed. Only POST is supported.")
-        return Response("Method Not Allowed: Content generation endpoints require POST requests.", status=405, mimetype='text/plain')
 
     # --- Daily Usage Reset Check ---
     today = date.today()
@@ -276,9 +272,13 @@ def proxy(path):
     use_stream_endpoint = False
     target_path = path # Default to original path
 
+    # Determine if the request is for a content generation endpoint
+    is_content_generation_endpoint = "generateContent" in path or "streamGenerateContent" in path
+
     if is_openai_format:
         if request.method != 'POST':
-             return Response("OpenAI compatible endpoint only supports POST.", status=405, mimetype='text/plain')
+            logging.warning("OpenAI compatible endpoint only supports POST. Received GET.")
+            return Response("OpenAI compatible endpoint only supports POST.", status=405, mimetype='text/plain')
         try:
             openai_request_data = json.loads(request_data_bytes)
             logging.debug(f"Original OpenAI request data: {openai_request_data}")
@@ -286,9 +286,7 @@ def proxy(path):
             logging.debug(f"Converted Gemini request data: {gemini_request_body_json}")
             logging.info(f"OpenAI request mapped to Gemini model: {target_gemini_model}, Streaming: {use_stream_endpoint}")
 
-            # Determine target Gemini endpoint
             action = "streamGenerateContent" if use_stream_endpoint else "generateContent"
-            # Construct the Gemini API path using the extracted/defaulted model
             target_path = f"v1beta/models/{target_gemini_model}:{action}"
 
         except json.JSONDecodeError:
@@ -297,17 +295,36 @@ def proxy(path):
         except Exception as e:
             logging.error(f"Error during OpenAI request conversion: {e}", exc_info=True)
             return Response("Error processing OpenAI request.", status=500, mimetype='text/plain')
+    elif request.method == 'GET' and is_content_generation_endpoint:
+        # Convert GET query parameters to a POST request body for Gemini
+        logging.info(f"Converting GET request with query params to POST for Gemini content generation: {request.args}")
+        user_prompt = request.args.get('prompt') or request.args.get('q')
+        if not user_prompt:
+            logging.error("GET request to content generation endpoint missing 'prompt' or 'q' query parameter.")
+            return Response("Bad Request: GET requests to content generation endpoints require a 'prompt' or 'q' query parameter.", status=400, mimetype='text/plain')
+
+        gemini_request_body_json = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": user_prompt}]
+                }
+            ]
+        }
+        # Default to gemini-pro for GET requests if not specified
+        target_gemini_model = request.args.get('model', 'gemini-pro')
+        use_stream_endpoint = request.args.get('stream', 'false').lower() == 'true'
+        action = "streamGenerateContent" if use_stream_endpoint else "generateContent"
+        target_path = f"v1beta/models/{target_gemini_model}:{action}"
+        logging.debug(f"Constructed Gemini POST body from GET params: {gemini_request_body_json}")
     else:
-        # Assume it's a direct Gemini request, pass body through (if method allows)
+        # Assume it's a direct Gemini request (POST, PUT, PATCH)
         if request_data_bytes and request.method in ['POST', 'PUT', 'PATCH']:
-             # We don't strictly need to parse it here, but might be useful for logging
-             try:
-                  gemini_request_body_json = json.loads(request_data_bytes)
-                  logging.debug(f"Direct Gemini request data: {gemini_request_body_json}")
-             except json.JSONDecodeError:
-                  logging.warning("Could not parse direct Gemini request body as JSON for logging.")
-                  # Send bytes directly if not JSON? Or assume JSON? Let's assume JSON for now.
-                  # If non-JSON needed, this needs adjustment.
+            try:
+                gemini_request_body_json = json.loads(request_data_bytes)
+                logging.debug(f"Direct Gemini request data: {gemini_request_body_json}")
+            except json.JSONDecodeError:
+                logging.warning("Could not parse direct Gemini request body as JSON for logging.")
         target_path = path # Use original path for direct Gemini requests
 
 
